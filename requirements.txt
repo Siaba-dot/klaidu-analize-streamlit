@@ -3,4 +3,6 @@ pandas
 matplotlib
 openpyxl
 openai
+tabulate
+
 
