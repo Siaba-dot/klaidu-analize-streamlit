@@ -8,6 +8,9 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.drawing.image import Image as ExcelImage
 import openai
 
+# Naujas OpenAI klientas
+client = openai.OpenAI(api_key=st.secrets["openai_api_key"])
+
 st.set_page_config(page_title="Klaidų analizė", layout="centered")
 st.title("📊 Klaidų analizė pagal mėnesius")
 
@@ -18,7 +21,6 @@ uploaded_file = st.file_uploader("📎 Pasirinkite Excel failą", type=["xlsx"])
 if uploaded_file:
     df = pd.read_excel(uploaded_file)
 
-    # Ištraukiame mėnesį iš „Klientas“
     def extract_month(text):
         if isinstance(text, str):
             match = re.search(r'\b(KOVAS|VASARIS|SAUSIS|BALANDIS|GEGUŽĖ|BIRŽELIS|LIEPA|RUGPJŪTIS|RUGSĖJIS|SPALIS|LAPKRITIS|GRUODIS)\b', text.upper())
@@ -29,7 +31,6 @@ if uploaded_file:
     df["Mėnuo"] = df["Klientas"].apply(extract_month)
     df["Yra klaida"] = df["Klaidos"].notna()
 
-    # Mėnesių tvarka
     menesiu_tvarka = ["Sausis", "Vasaris", "Kovas", "Balandis", "Gegužė", "Birželis",
                       "Liepa", "Rugpjūtis", "Rugsėjis", "Spalis", "Lapkritis", "Gruodis"]
     visi_menesiai = sorted(df["Mėnuo"].dropna().unique(), key=lambda x: menesiu_tvarka.index(x) if x in menesiu_tvarka else 99)
@@ -37,7 +38,6 @@ if uploaded_file:
     pasirinkti_menesiai = st.multiselect("📆 Pasirinkite mėnesius analizei", visi_menesiai, default=visi_menesiai)
     df_filtered = df[df["Mėnuo"].isin(pasirinkti_menesiai)]
 
-    # Suvestinė
     summary = df_filtered.groupby("Mėnuo").agg(
         Sąskaitų_skaičius=("Sąskaitos faktūros Nr.", "nunique"),
         Su_klaidomis=("Yra klaida", "sum")
@@ -50,7 +50,7 @@ if uploaded_file:
     st.subheader("📋 Suvestinė")
     st.dataframe(summary, use_container_width=True)
 
-    # 📈 Grafikas su dviguba ašimi
+    # 📈 Grafikas
     st.subheader("📊 Sąskaitų skaičius ir klaidų procentas")
     fig, ax1 = plt.subplots(figsize=(10, 6))
 
@@ -77,7 +77,7 @@ if uploaded_file:
     ]
     st.dataframe(klaidos.reset_index(drop=True), use_container_width=True)
 
-    # 📥 Excel ataskaita su grafiku
+    # 📥 Excel su grafiku
     img_buffer = io.BytesIO()
     fig.savefig(img_buffer, format="png")
     img_buffer.seek(0)
@@ -111,25 +111,25 @@ if uploaded_file:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # 🧠 AI analizė
+    # 🧠 AI analizė (OpenAI naujoji sintaksė)
     st.subheader("🤖 Dirbtinio intelekto analizė")
     try:
-        openai.api_key = st.secrets["openai_api_key"]  # užtikrink, kad API raktas įkeltas į Streamlit secrets
-
+        markdown_table = summary.to_markdown(index=False)
         analysis_prompt = (
             "Analizuok pateiktus duomenis apie sąskaitų skaičių ir klaidų procentą pagal mėnesius. "
             "Pateik įžvalgas apie tendencijas, galimas klaidų priežastis ir pateik pasiūlymus, kaip jas sumažinti ateityje.\n\n"
-            + summary.to_markdown(index=False)
+            + markdown_table
         )
 
-        response = openai.ChatCompletion.create(
-            model="gpt-4",  # arba "gpt-3.5-turbo"
+        response = client.chat.completions.create(
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "Tu esi patyręs verslo analitikas."},
                 {"role": "user", "content": analysis_prompt}
             ],
             temperature=0.4
         )
+
         st.markdown(response.choices[0].message.content)
 
     except Exception as e:
