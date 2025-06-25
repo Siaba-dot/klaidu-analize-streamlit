@@ -6,6 +6,7 @@ import io
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.drawing.image import Image as ExcelImage
+import openai
 
 st.set_page_config(page_title="Klaidų analizė", layout="centered")
 st.title("📊 Klaidų analizė pagal mėnesius")
@@ -109,3 +110,28 @@ if uploaded_file:
         file_name="Klaidu_Ataskaita.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+    # 🧠 AI analizė
+    st.subheader("🤖 Dirbtinio intelekto analizė")
+    try:
+        openai.api_key = st.secrets["openai_api_key"]  # užtikrink, kad API raktas įkeltas į Streamlit secrets
+
+        analysis_prompt = (
+            "Analizuok pateiktus duomenis apie sąskaitų skaičių ir klaidų procentą pagal mėnesius. "
+            "Pateik įžvalgas apie tendencijas, galimas klaidų priežastis ir pateik pasiūlymus, kaip jas sumažinti ateityje.\n\n"
+            + summary.to_markdown(index=False)
+        )
+
+        response = openai.ChatCompletion.create(
+            model="gpt-4",  # arba "gpt-3.5-turbo"
+            messages=[
+                {"role": "system", "content": "Tu esi patyręs verslo analitikas."},
+                {"role": "user", "content": analysis_prompt}
+            ],
+            temperature=0.4
+        )
+        st.markdown(response.choices[0].message.content)
+
+    except Exception as e:
+        st.warning("Nepavyko gauti AI analizės. Patikrink API raktą Streamlit `secrets` nustatymuose.")
+        st.error(str(e))
