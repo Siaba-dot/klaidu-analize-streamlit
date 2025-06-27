@@ -14,7 +14,7 @@ client = openai.OpenAI(api_key=st.secrets["openai_api_key"])
 st.set_page_config(page_title="Klaidų analizė", layout="centered")
 st.title("\U0001F4CA Klaidų analizė pagal mėnesius")
 
-st.write("Įkelkite Excel failą su stulpeliais **Klientas**, **Užsakovas**, **Sąskaitos faktūros Nr.**, **Klaidos**")
+st.write("Įkelkite Excel failą su stulpeliais **Klientas**, **Užsakovas**, **Sąskaitos faktūros Nr.**, **Klaidos**, **Siuntėjas**")
 
 uploaded_file = st.file_uploader("\U0001F4CE Pasirinkite Excel failą", type=["xlsx"])
 
@@ -47,7 +47,6 @@ if uploaded_file:
     summary["Mėnesio_nr"] = summary["Mėnuo"].apply(lambda x: menesiu_tvarka.index(x) if x in menesiu_tvarka else -1)
     summary = summary.sort_values("Mėnesio_nr").drop(columns="Mėnesio_nr")
 
-    # Normalizuotas sąskaitų kiekis procentais
     max_skaicius = summary["Sąskaitų_skaičius"].max()
     summary["Sąskaitų_procentas"] = (summary["Sąskaitų_skaičius"] / max_skaicius * 100).round(2)
 
@@ -77,7 +76,6 @@ if uploaded_file:
     st.dataframe(summary[["Mėnuo", "Klaidų_procentas", "Sąskaitų_skaičius", "Sąskaitų_procentas", "Su_klaidomis", "Įžvalga"]],
                  use_container_width=True)
 
-    # Naujas grafikas su viena Y ašimi (viskas procentais)
     st.subheader("\U0001F4CA Normalizuotas palyginimas (% nuo maksimumo)")
     fig_export, ax_export = plt.subplots(figsize=(10, 6))
     ax_export.plot(summary["Mėnuo"], summary["Sąskaitų_procentas"], label="Sąskaitų kiekis (%)", color="blue", marker="o")
@@ -92,9 +90,23 @@ if uploaded_file:
 
     st.subheader("\U0001F4DD Klaidų sąrašas")
     klaidos = df_filtered[df_filtered["Yra klaida"] == True][
-        ["Mėnuo", "Užsakovas", "Sąskaitos faktūros Nr.", "Klaidos"]
+        ["Mėnuo", "Užsakovas", "Sąskaitos faktūros Nr.", "Klaidos", "Siuntėjas"]
     ]
     st.dataframe(klaidos.reset_index(drop=True), use_container_width=True)
+
+    # Nustatyti dažniausiai klystantį užsakovą ir siuntėją
+    st.subheader("\U0001F50E Dažniausiai klystantys užsakovai ir siuntėjai")
+    uzsakovai_stats = klaidos["Užsakovas"].value_counts().reset_index()
+    uzsakovai_stats.columns = ["Užsakovas", "Klaidų skaičius"]
+
+    siuntejai_stats = klaidos["Siuntėjas"].value_counts().reset_index()
+    siuntejai_stats.columns = ["Siuntėjas", "Klaidų skaičius"]
+
+    st.write("**Dažniausiai klystantys užsakovai:**")
+    st.dataframe(uzsakovai_stats, use_container_width=True)
+
+    st.write("**Dažniausiai klystantys siuntėjai (aktų atsakingi asmenys):**")
+    st.dataframe(siuntejai_stats, use_container_width=True)
 
     img_buffer = io.BytesIO()
     fig_export.savefig(img_buffer, format="png")
