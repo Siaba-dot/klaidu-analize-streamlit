@@ -79,18 +79,16 @@ if uploaded_file:
 
     # Naujas grafikas su viena Y ašimi (viskas procentais)
     st.subheader("\U0001F4CA Normalizuotas palyginimas (% nuo maksimumo)")
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    ax.plot(summary["Mėnuo"], summary["Sąskaitų_procentas"], label="Sąskaitų kiekis (%)", color="blue", marker="o")
-    ax.plot(summary["Mėnuo"], summary["Klaidų_procentas"], label="Klaidų procentas (%)", color="red", marker="o")
-
-    ax.set_ylabel("Procentai (%)")
-    ax.set_xlabel("Mėnuo")
-    ax.set_ylim(0, 100)
-    ax.legend()
+    fig_export, ax_export = plt.subplots(figsize=(10, 6))
+    ax_export.plot(summary["Mėnuo"], summary["Sąskaitų_procentas"], label="Sąskaitų kiekis (%)", color="blue", marker="o")
+    ax_export.plot(summary["Mėnuo"], summary["Klaidų_procentas"], label="Klaidų procentas (%)", color="red", marker="o")
+    ax_export.set_ylabel("Procentai (%)")
+    ax_export.set_xlabel("Mėnuo")
+    ax_export.set_ylim(0, 100)
+    ax_export.legend()
+    ax_export.grid(True)
     plt.title("Sąskaitų kiekis ir klaidų procentas (procentinė išraiška)")
-    plt.grid(True)
-    st.pyplot(fig)
+    st.pyplot(fig_export)
 
     st.subheader("\U0001F4DD Klaidų sąrašas")
     klaidos = df_filtered[df_filtered["Yra klaida"] == True][
@@ -99,7 +97,7 @@ if uploaded_file:
     st.dataframe(klaidos.reset_index(drop=True), use_container_width=True)
 
     img_buffer = io.BytesIO()
-    fig.savefig(img_buffer, format="png")
+    fig_export.savefig(img_buffer, format="png")
     img_buffer.seek(0)
 
     wb = Workbook()
