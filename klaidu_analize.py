@@ -47,6 +47,10 @@ if uploaded_file:
     summary["Mėnesio_nr"] = summary["Mėnuo"].apply(lambda x: menesiu_tvarka.index(x) if x in menesiu_tvarka else -1)
     summary = summary.sort_values("Mėnesio_nr").drop(columns="Mėnesio_nr")
 
+    # Normalizuotas sąskaitų kiekis procentais
+    max_skaicius = summary["Sąskaitų_skaičius"].max()
+    summary["Sąskaitų_procentas"] = (summary["Sąskaitų_skaičius"] / max_skaicius * 100).round(2)
+
     st.subheader("\U0001F4CB Suvestinė")
     st.dataframe(summary, use_container_width=True)
 
@@ -70,28 +74,22 @@ if uploaded_file:
     summary["Įžvalga"] = summary.apply(generate_insight, axis=1)
 
     st.subheader("🔎 Įžvalgos pagal mėnesius")
-    st.dataframe(summary[["Mėnuo", "Klaidų_procentas", "Sąskaitų_skaičius", "Su_klaidomis", "Įžvalga"]],
+    st.dataframe(summary[["Mėnuo", "Klaidų_procentas", "Sąskaitų_skaičius", "Sąskaitų_procentas", "Su_klaidomis", "Įžvalga"]],
                  use_container_width=True)
 
-    st.subheader("\U0001F4CA Sąskaitų skaičius ir klaidų procentas")
-    fig, ax1 = plt.subplots(figsize=(10, 6))
+    # Naujas grafikas su viena Y ašimi (viskas procentais)
+    st.subheader("\U0001F4CA Normalizuotas palyginimas (% nuo maksimumo)")
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-    color1 = 'tab:blue'
-    ax1.set_xlabel("Mėnuo")
-    ax1.set_ylabel("Sąskaitų skaičius", color=color1)
-    ax1.bar(summary["Mėnuo"], summary["Sąskaitų_skaičius"], color=color1, alpha=0.6)
-    ax1.tick_params(axis='y', labelcolor=color1)
+    ax.plot(summary["Mėnuo"], summary["Sąskaitų_procentas"], label="Sąskaitų kiekis (%)", color="blue", marker="o")
+    ax.plot(summary["Mėnuo"], summary["Klaidų_procentas"], label="Klaidų procentas (%)", color="red", marker="o")
 
-    ax2 = ax1.twinx()
-    color2 = 'tab:red'
-    ax2.set_ylabel("Klaidų procentas (%)", color=color2)
-    ax2.plot(summary["Mėnuo"], summary["Klaidų_procentas"], color=color2, marker='o', linewidth=2)
-    ax2.tick_params(axis='y', labelcolor=color2)
-    ax2.set_ylim(0, 30)  # Apribojame klaidų procento ašį iki 30%
-    ax2.set_yticks([0, 10, 20, 30])  # Žymime kas 10%
-
-    plt.title("Sąskaitų skaičius ir klaidų procentas pagal mėnesius")
-    fig.tight_layout()
+    ax.set_ylabel("Procentai (%)")
+    ax.set_xlabel("Mėnuo")
+    ax.set_ylim(0, 100)
+    ax.legend()
+    plt.title("Sąskaitų kiekis ir klaidų procentas (procentinė išraiška)")
+    plt.grid(True)
     st.pyplot(fig)
 
     st.subheader("\U0001F4DD Klaidų sąrašas")
