@@ -88,6 +88,7 @@ if uploaded_file:
     ax2.plot(summary["Mėnuo"], summary["Klaidų_procentas"], color=color2, marker='o', linewidth=2)
     ax2.tick_params(axis='y', labelcolor=color2)
     ax2.set_ylim(0, 30)  # Apribojame klaidų procento ašį iki 30%
+    ax2.set_yticks([0, 10, 20, 30])  # Žymime kas 10%
 
     plt.title("Sąskaitų skaičius ir klaidų procentas pagal mėnesius")
     fig.tight_layout()
