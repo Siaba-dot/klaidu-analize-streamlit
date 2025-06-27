@@ -95,7 +95,6 @@ if uploaded_file:
     st.dataframe(klaidos.reset_index(drop=True), use_container_width=True)
 
     # Nustatyti dažniausiai klystantį užsakovą ir siuntėją
-    st.subheader("\U0001F50E Dažniausiai klystantys užsakovai ir siuntėjai")
     uzsakovai_stats = klaidos["Užsakovas"].value_counts().reset_index()
     uzsakovai_stats.columns = ["Užsakovas", "Klaidų skaičius"]
 
