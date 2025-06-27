@@ -50,7 +50,6 @@ if uploaded_file:
     st.subheader("\U0001F4CB Suvestinė")
     st.dataframe(summary, use_container_width=True)
 
-    # ➕ Nauja: Įžvalgų generavimas
     def generate_insight(row):
         klaidos = row["Su_klaidomis"]
         procentas = row["Klaidų_procentas"]
@@ -70,12 +69,10 @@ if uploaded_file:
 
     summary["Įžvalga"] = summary.apply(generate_insight, axis=1)
 
-    # ➕ Rodome lentelę su įžvalgomis
     st.subheader("🔎 Įžvalgos pagal mėnesius")
     st.dataframe(summary[["Mėnuo", "Klaidų_procentas", "Sąskaitų_skaičius", "Su_klaidomis", "Įžvalga"]],
                  use_container_width=True)
 
-    # 📈 Grafikas
     st.subheader("\U0001F4CA Sąskaitų skaičius ir klaidų procentas")
     fig, ax1 = plt.subplots(figsize=(10, 6))
 
@@ -90,19 +87,18 @@ if uploaded_file:
     ax2.set_ylabel("Klaidų procentas (%)", color=color2)
     ax2.plot(summary["Mėnuo"], summary["Klaidų_procentas"], color=color2, marker='o', linewidth=2)
     ax2.tick_params(axis='y', labelcolor=color2)
+    ax2.set_ylim(0, 30)  # Apribojame klaidų procento ašį iki 30%
 
     plt.title("Sąskaitų skaičius ir klaidų procentas pagal mėnesius")
     fig.tight_layout()
     st.pyplot(fig)
 
-    # 📝 Klaidų sąrašas
     st.subheader("\U0001F4DD Klaidų sąrašas")
     klaidos = df_filtered[df_filtered["Yra klaida"] == True][
         ["Mėnuo", "Užsakovas", "Sąskaitos faktūros Nr.", "Klaidos"]
     ]
     st.dataframe(klaidos.reset_index(drop=True), use_container_width=True)
 
-    # 📥 Excel su grafiku
     img_buffer = io.BytesIO()
     fig.savefig(img_buffer, format="png")
     img_buffer.seek(0)
@@ -136,7 +132,6 @@ if uploaded_file:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # 🧠 AI analizė
     st.subheader("\U0001F916 Dirbtinio intelekto analizė")
     try:
         markdown_table = summary.to_markdown(index=False)
