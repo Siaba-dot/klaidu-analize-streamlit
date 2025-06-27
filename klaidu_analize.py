@@ -94,8 +94,9 @@ if uploaded_file:
     ]
     st.dataframe(klaidos.reset_index(drop=True), use_container_width=True)
 
-    # Nustatyti dažniausiai klystantį užsakovą ir siuntėją
-    uzsakovai_stats = klaidos["Užsakovas"].value_counts().reset_index()
+    # Nustatyti dažniausiai klystančius užsakovus ir siuntėjus (kai klaidos kartojasi > 1)
+    uzsakovai_stats = klaidos["Užsakovas"].value_counts()
+    uzsakovai_stats = uzsakovai_stats[uzsakovai_stats > 1].reset_index()
     uzsakovai_stats.columns = ["Užsakovas", "Klaidų skaičius"]
 
     siuntejai_stats = klaidos["Siuntėjas"].value_counts().reset_index()
