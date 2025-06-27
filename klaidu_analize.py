@@ -102,10 +102,10 @@ if uploaded_file:
     siuntejai_stats = klaidos["Siuntėjas"].value_counts().reset_index()
     siuntejai_stats.columns = ["Siuntėjas", "Klaidų skaičius"]
 
-    st.write("**Dažniausiai klystantys užsakovai:**")
+    st.write("**Dažniausi klientai su klaidinga informacija aktuose:**")
     st.dataframe(uzsakovai_stats, use_container_width=True)
 
-    st.write("**Dažniausiai klystantys siuntėjai (aktų atsakingi asmenys):**")
+    st.write("**Dažniausi šių aktų siuntėjai:**")
     st.dataframe(siuntejai_stats, use_container_width=True)
 
     img_buffer = io.BytesIO()
