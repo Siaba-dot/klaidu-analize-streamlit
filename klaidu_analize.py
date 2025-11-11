@@ -23,7 +23,7 @@ if uploaded_file:
 
     def extract_month(text):
         if isinstance(text, str):
-            match = re.search(r'\b(KOVAS|VASARIS|SAUSIS|BALANDIS|GEGU\u017d\u0116|BIR\u017dELIS|LIEPA|RUGPJ\u016aTIS|RUGS\u0116JIS|SPALIS|LAPKRTIS|GRUODIS)\b', text.upper())
+            match = re.search(r'\b(KOVAS|VASARIS|SAUSIS|BALANDIS|GEGU\u017d\u0116|BIR\u017dELIS|LIEPA|RUGPJ\u016aTIS|RUGS\u0116JIS|SPALIS|LAPKRITIS|GRUODIS)\b', text.upper())
             if match:
                 return match.group(1).capitalize()
         return "Nežinoma"
@@ -164,3 +164,4 @@ if uploaded_file:
     except Exception as e:
         st.warning("Nepavyko gauti AI analizės. Patikrink API raktą Streamlit `secrets` nustatymuose.")
         st.error(str(e))
+
