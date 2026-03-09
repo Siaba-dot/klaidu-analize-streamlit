@@ -13,10 +13,10 @@ import openai
 # OpenAI klientas
 client = openai.OpenAI(api_key=st.secrets["openai_api_key"])
 
-st.set_page_config(page_title="Klaidų analizė", layout="wide")
+st.set_page_config(page_title="Klaidų analizės dashboard", layout="wide")
 
 # ----------------------------
-# Stilius
+# STILIUS
 # ----------------------------
 st.markdown("""
 <style>
@@ -55,74 +55,75 @@ div[data-testid="stDataFrame"] {
 """, unsafe_allow_html=True)
 
 st.title("📊 Klaidų analizės dashboard")
-st.caption(
-    "Analizėje naudojama: **Klaidos priežastis** iš **O** stulpelio ir **Klaidos** iš **P** stulpelio."
-)
+st.caption("Analizėje naudojama: **Klaidos priežastis** iš **O** stulpelio ir **Klaidos** iš **P** stulpelio.")
 
 uploaded_file = st.file_uploader("📎 Pasirinkite Excel failą", type=["xlsx"])
+
+
+# ----------------------------
+# PAGALBINĖS FUNKCIJOS
+# ----------------------------
+def extract_month(text):
+    if isinstance(text, str):
+        match = re.search(
+            r"\b(KOVAS|VASARIS|SAUSIS|BALANDIS|GEGUŽĖ|BIRŽELIS|LIEPA|RUGPJŪTIS|RUGSĖJIS|SPALIS|LAPKRITIS|GRUODIS)\b",
+            text.upper()
+        )
+        if match:
+            return match.group(1).capitalize()
+    return "Nežinoma"
+
+
+def clean_text(value):
+    if pd.isna(value):
+        return None
+    text = str(value).strip()
+    return text if text else None
+
+
+def generate_insight(row):
+    klaidos = row["Su_klaidomis"]
+    procentas = row["Klaidų_procentas"]
+    saskaitu = row["Sąskaitų_skaičius"]
+    menuo = row["Mėnuo"]
+
+    if klaidos == 0:
+        return f"✅ {menuo}: jokių klaidų – puikus rezultatas."
+    elif saskaitu < 15 and procentas >= 15:
+        return f"⚠️ {menuo}: nors klaidų tik {klaidos}, jos sudaro {procentas:.2f}% – mažas kiekis padidina procentinę įtaką."
+    elif procentas >= 20:
+        return f"🔴 {menuo}: labai aukštas klaidų procentas ({procentas:.2f}%) – būtina peržiūrėti procesą."
+    elif procentas >= 15:
+        return f"🟠 {menuo}: padidėjęs klaidų procentas ({procentas:.2f}%) – verta ieškoti priežasčių."
+    else:
+        return f"🟢 {menuo}: klaidų lygis ({procentas:.2f}%) yra kontroliuojamas."
+
+
+def safe_add_image(ws, image_path, anchor):
+    if os.path.exists(image_path):
+        img = ExcelImage(image_path)
+        img.anchor = anchor
+        ws.add_image(img)
+
+
+def wrap_label(text, width=18):
+    if pd.isna(text):
+        return "Nenurodyta"
+    return "\n".join(textwrap.wrap(str(text), width=width))
+
+
+def ellipsis_label(text, max_len=30):
+    if pd.isna(text):
+        return "Nenurodyta"
+    text = str(text)
+    return text if len(text) <= max_len else text[:max_len - 3] + "..."
 
 
 if uploaded_file:
     df = pd.read_excel(uploaded_file)
 
     # ----------------------------
-    # Pagalbinės funkcijos
-    # ----------------------------
-    def extract_month(text):
-        if isinstance(text, str):
-            match = re.search(
-                r"\b(KOVAS|VASARIS|SAUSIS|BALANDIS|GEGUŽĖ|BIRŽELIS|LIEPA|RUGPJŪTIS|RUGSĖJIS|SPALIS|LAPKRITIS|GRUODIS)\b",
-                text.upper()
-            )
-            if match:
-                return match.group(1).capitalize()
-        return "Nežinoma"
-
-    def clean_text(value):
-        if pd.isna(value):
-            return None
-        text = str(value).strip()
-        return text if text else None
-
-    def generate_insight(row):
-        klaidos = row["Su_klaidomis"]
-        procentas = row["Klaidų_procentas"]
-        saskaitu = row["Sąskaitų_skaičius"]
-        menuo = row["Mėnuo"]
-
-        if klaidos == 0:
-            return f"✅ {menuo}: jokių klaidų – puikus rezultatas."
-        elif saskaitu < 15 and procentas >= 15:
-            return (
-                f"⚠️ {menuo}: nors klaidų tik {klaidos}, jos sudaro {procentas:.2f}% – "
-                "mažas kiekis padidina procentinę įtaką."
-            )
-        elif procentas >= 20:
-            return f"🔴 {menuo}: labai aukštas klaidų procentas ({procentas:.2f}%) – būtina peržiūrėti procesą."
-        elif procentas >= 15:
-            return f"🟠 {menuo}: padidėjęs klaidų procentas ({procentas:.2f}%) – verta ieškoti priežasčių."
-        else:
-            return f"🟢 {menuo}: klaidų lygis ({procentas:.2f}%) yra kontroliuojamas."
-
-    def safe_add_image(ws, image_path, anchor):
-        if os.path.exists(image_path):
-            img = ExcelImage(image_path)
-            img.anchor = anchor
-            ws.add_image(img)
-
-    def wrap_label(text, width=22):
-        if pd.isna(text):
-            return "Nenurodyta"
-        return "\n".join(textwrap.wrap(str(text), width=width))
-
-    def ellipsis_label(text, max_len=28):
-        if pd.isna(text):
-            return "Nenurodyta"
-        text = str(text)
-        return text if len(text) <= max_len else text[:max_len - 3] + "..."
-
-    # ----------------------------
-    # Patikros
+    # PRIVALOMŲ STULPELIŲ PATIKRA
     # ----------------------------
     required_named_columns = ["Klientas", "Užsakovas", "Sąskaitos faktūros Nr.", "Siuntėjas"]
     missing_named = [col for col in required_named_columns if col not in df.columns]
@@ -136,10 +137,11 @@ if uploaded_file:
         st.stop()
 
     # ----------------------------
-    # Nauji stulpeliai iš O ir P
+    # DUOMENŲ PARUOŠIMAS
+    # O = 14 indeksas, P = 15 indeksas
     # ----------------------------
-    df["Klaidos_priežastis"] = df.iloc[:, 14].apply(clean_text)  # O
-    df["Klaidos"] = df.iloc[:, 15].apply(clean_text)             # P
+    df["Klaidos_priežastis"] = df.iloc[:, 14].apply(clean_text)
+    df["Klaidos"] = df.iloc[:, 15].apply(clean_text)
     df["Mėnuo"] = df["Klientas"].apply(extract_month)
     df["Yra klaida"] = df["Klaidos"].notna()
 
@@ -152,12 +154,11 @@ if uploaded_file:
         df["Mėnuo"].dropna().unique(),
         key=lambda x: menesiu_tvarka.index(x) if x in menesiu_tvarka else 99
     )
-
     visi_siuntejai = sorted(df["Siuntėjas"].dropna().astype(str).unique().tolist())
     visi_uzsakovai = sorted(df["Užsakovas"].dropna().astype(str).unique().tolist())
 
     # ----------------------------
-    # Filtrai sidebar
+    # FILTRAI
     # ----------------------------
     st.sidebar.header("🎛️ Filtrai")
 
@@ -195,7 +196,7 @@ if uploaded_file:
         st.stop()
 
     # ----------------------------
-    # Mėnesinė suvestinė
+    # SUVESTINĖ PAGAL MĖNESIUS
     # ----------------------------
     summary = df_filtered.groupby("Mėnuo").agg(
         Sąskaitų_skaičius=("Sąskaitos faktūros Nr.", "nunique"),
@@ -219,7 +220,7 @@ if uploaded_file:
     summary["Įžvalga"] = summary.apply(generate_insight, axis=1)
 
     # ----------------------------
-    # Klaidų sąrašas
+    # KLAIDŲ SĄRAŠAS
     # ----------------------------
     klaidos = df_filtered[df_filtered["Yra klaida"] == True][[
         "Mėnuo",
@@ -273,7 +274,7 @@ if uploaded_file:
         """, unsafe_allow_html=True)
 
     # ----------------------------
-    # 1 eilė: mėnesių analizė
+    # 1 EILĖ: MĖNESIŲ SUVESTINĖ + GRAFIKAS
     # ----------------------------
     left, right = st.columns([1.15, 1])
 
@@ -283,28 +284,28 @@ if uploaded_file:
 
     with right:
         st.subheader("📈 Normalizuotas palyginimas")
-        fig_export, ax_export = plt.subplots(figsize=(9, 5.5))
-        ax_export.plot(
+        fig_months, ax_months = plt.subplots(figsize=(9, 5.5))
+        ax_months.plot(
             summary["Mėnuo"],
             summary["Sąskaitų_procentas"],
             label="Sąskaitų kiekis (%)",
             marker="o",
             linewidth=2
         )
-        ax_export.plot(
+        ax_months.plot(
             summary["Mėnuo"],
             summary["Klaidų_procentas"],
             label="Klaidų procentas (%)",
             marker="o",
             linewidth=2
         )
-        ax_export.set_ylabel("Procentai (%)")
-        ax_export.set_xlabel("Mėnuo")
-        ax_export.set_ylim(0, 100)
-        ax_export.legend()
-        ax_export.grid(True, alpha=0.3)
+        ax_months.set_ylabel("Procentai (%)")
+        ax_months.set_xlabel("Mėnuo")
+        ax_months.set_ylim(0, 100)
+        ax_months.legend()
+        ax_months.grid(True, alpha=0.3)
         plt.title("Sąskaitų kiekis ir klaidų procentas")
-        st.pyplot(fig_export)
+        st.pyplot(fig_months)
 
     st.subheader("🔎 Įžvalgos pagal mėnesius")
     st.dataframe(
@@ -320,19 +321,57 @@ if uploaded_file:
     )
 
     # ----------------------------
-    # 2 eilė: priežastys + siuntėjai
+    # ANALIZĖ, JEI YRA KLAIDŲ
     # ----------------------------
-    c1, c2 = st.columns(2)
-
     if not klaidos.empty:
+        # Klaidos pagal priežastį
         priezastys = klaidos["Klaidos_priežastis"].fillna("Nenurodyta").value_counts().reset_index()
         priezastys.columns = ["Klaidos priežastis", "Klaidų skaičius"]
 
-        siuntejai_stats = klaidos["Siuntėjas"].fillna("Nenurodyta").value_counts().reset_index()
-        siuntejai_stats.columns = ["Siuntėjas", "Klaidų skaičius"]
+        # Klaidos pagal siuntėją
+        siuntejai_klaidos = klaidos["Siuntėjas"].fillna("Nenurodyta").value_counts().reset_index()
+        siuntejai_klaidos.columns = ["Siuntėjas", "Klaidų skaičius"]
 
-        uzsakovai_stats = klaidos["Užsakovas"].fillna("Nenurodyta").value_counts().reset_index()
-        uzsakovai_stats.columns = ["Užsakovas", "Klaidų skaičius"]
+        # Visi dokumentai pagal siuntėją
+        siuntejai_visi = df_filtered.groupby("Siuntėjas").agg(
+            Dokumentų_skaičius=("Sąskaitos faktūros Nr.", "count")
+        ).reset_index()
+
+        # Sujungimas: dokumentų kiekis + klaidų kiekis
+        siuntejai_stats = siuntejai_visi.merge(siuntejai_klaidos, on="Siuntėjas", how="left")
+        siuntejai_stats["Klaidų skaičius"] = siuntejai_stats["Klaidų skaičius"].fillna(0).astype(int)
+        siuntejai_stats["Klaidų_procentas"] = (
+            siuntejai_stats["Klaidų skaičius"] / siuntejai_stats["Dokumentų_skaičius"] * 100
+        ).round(2)
+
+        siuntejai_stats = siuntejai_stats.sort_values(
+            by=["Klaidų skaičius", "Dokumentų_skaičius"],
+            ascending=[False, False]
+        ).reset_index(drop=True)
+
+        # Užsakovų analizė
+        uzsakovai_klaidos = klaidos["Užsakovas"].fillna("Nenurodyta").value_counts().reset_index()
+        uzsakovai_klaidos.columns = ["Užsakovas", "Klaidų skaičius"]
+
+        uzsakovai_visi = df_filtered.groupby("Užsakovas").agg(
+            Dokumentų_skaičius=("Sąskaitos faktūros Nr.", "count")
+        ).reset_index()
+
+        uzsakovai_stats = uzsakovai_visi.merge(uzsakovai_klaidos, on="Užsakovas", how="left")
+        uzsakovai_stats["Klaidų skaičius"] = uzsakovai_stats["Klaidų skaičius"].fillna(0).astype(int)
+        uzsakovai_stats["Klaidų_procentas"] = (
+            uzsakovai_stats["Klaidų skaičius"] / uzsakovai_stats["Dokumentų_skaičius"] * 100
+        ).round(2)
+
+        uzsakovai_stats = uzsakovai_stats.sort_values(
+            by=["Klaidų skaičius", "Dokumentų_skaičius"],
+            ascending=[False, False]
+        ).reset_index(drop=True)
+
+        # ----------------------------
+        # 2 EILĖ: PRIEŽASTYS + TOP SIUNTĖJAI PAGAL KLAIDŲ KIEKĮ
+        # ----------------------------
+        c1, c2 = st.columns(2)
 
         with c1:
             st.subheader("📌 Klaidos pagal priežastį")
@@ -350,30 +389,47 @@ if uploaded_file:
             st.subheader("📨 TOP siuntėjai pagal klaidų kiekį")
             st.dataframe(siuntejai_stats, use_container_width=True, height=320)
 
-            top_siuntejai = siuntejai_stats.head(10).copy()
-            top_siuntejai["Siuntėjas_short"] = top_siuntejai["Siuntėjas"].apply(lambda x: ellipsis_label(x, 32))
+            top_siuntejai_count = siuntejai_stats.head(10).copy()
+            top_siuntejai_count["Siuntėjas_short"] = top_siuntejai_count["Siuntėjas"].apply(lambda x: ellipsis_label(x, 32))
 
-            fig_sender, ax_sender = plt.subplots(figsize=(8, 5))
-            ax_sender.barh(top_siuntejai["Siuntėjas_short"], top_siuntejai["Klaidų skaičius"])
-            ax_sender.set_title("TOP siuntėjai pagal klaidų kiekį")
-            ax_sender.set_xlabel("Klaidų skaičius")
-            ax_sender.invert_yaxis()
-            ax_sender.grid(axis="x", alpha=0.3)
-            st.pyplot(fig_sender)
-    else:
-        priezastys = pd.DataFrame(columns=["Klaidos priežastis", "Klaidų skaičius"])
-        siuntejai_stats = pd.DataFrame(columns=["Siuntėjas", "Klaidų skaičius"])
-        uzsakovai_stats = pd.DataFrame(columns=["Užsakovas", "Klaidų skaičius"])
-        st.info("Pasirinktuose filtruose klaidų nėra.")
+            fig_sender_count, ax_sender_count = plt.subplots(figsize=(8, 5))
+            ax_sender_count.barh(top_siuntejai_count["Siuntėjas_short"], top_siuntejai_count["Klaidų skaičius"])
+            ax_sender_count.set_title("TOP siuntėjai pagal klaidų kiekį")
+            ax_sender_count.set_xlabel("Klaidų skaičius")
+            ax_sender_count.invert_yaxis()
+            ax_sender_count.grid(axis="x", alpha=0.3)
+            st.pyplot(fig_sender_count)
 
-    # ----------------------------
-    # 3 eilė: užsakovai + pareto
-    # ----------------------------
-    c3, c4 = st.columns(2)
+        # ----------------------------
+        # 3 EILĖ: TOP SIUNTĖJAI PAGAL KLAIDŲ PROCENTĄ + TOP UŽSAKOVAI
+        # ----------------------------
+        c3, c4 = st.columns(2)
 
-    with c3:
-        st.subheader("🏢 TOP užsakovai su klaidomis")
-        if not uzsakovai_stats.empty:
+        with c3:
+            st.subheader("📊 Siuntėjų kokybė pagal klaidų procentą")
+
+            siuntejai_proc = siuntejai_stats[siuntejai_stats["Dokumentų_skaičius"] >= 3].copy()
+            siuntejai_proc = siuntejai_proc.sort_values(
+                by=["Klaidų_procentas", "Klaidų skaičius"],
+                ascending=[False, False]
+            ).reset_index(drop=True)
+
+            st.caption("Rodomi siuntėjai, kurie turi bent 3 dokumentus, kad procentas nebūtų klaidinantis.")
+            st.dataframe(siuntejai_proc, use_container_width=True, height=320)
+
+            top_siuntejai_proc = siuntejai_proc.head(10).copy()
+            top_siuntejai_proc["Siuntėjas_short"] = top_siuntejai_proc["Siuntėjas"].apply(lambda x: ellipsis_label(x, 32))
+
+            fig_sender_proc, ax_sender_proc = plt.subplots(figsize=(8, 5))
+            ax_sender_proc.barh(top_siuntejai_proc["Siuntėjas_short"], top_siuntejai_proc["Klaidų_procentas"])
+            ax_sender_proc.set_title("TOP siuntėjai pagal klaidų procentą")
+            ax_sender_proc.set_xlabel("Klaidų procentas (%)")
+            ax_sender_proc.invert_yaxis()
+            ax_sender_proc.grid(axis="x", alpha=0.3)
+            st.pyplot(fig_sender_proc)
+
+        with c4:
+            st.subheader("🏢 TOP užsakovai su klaidomis")
             st.dataframe(uzsakovai_stats, use_container_width=True, height=320)
 
             top_uzsakovai = uzsakovai_stats.head(10).copy()
@@ -381,63 +437,75 @@ if uploaded_file:
 
             fig_customer, ax_customer = plt.subplots(figsize=(8, 5))
             ax_customer.barh(top_uzsakovai["Užsakovas_short"], top_uzsakovai["Klaidų skaičius"])
-            ax_customer.set_title("TOP užsakovai su klaidomis")
+            ax_customer.set_title("TOP užsakovai pagal klaidų kiekį")
             ax_customer.set_xlabel("Klaidų skaičius")
             ax_customer.invert_yaxis()
             ax_customer.grid(axis="x", alpha=0.3)
             st.pyplot(fig_customer)
-        else:
-            st.info("Nėra duomenų.")
 
-    with c4:
+        # ----------------------------
+        # 4 EILĖ: PARETO
+        # ----------------------------
         st.subheader("📊 Pareto analizė pagal siuntėją")
-        if not siuntejai_stats.empty:
-            pareto = siuntejai_stats.copy()
-            pareto["Kumuliacinis %"] = (
-                pareto["Klaidų skaičius"].cumsum() / pareto["Klaidų skaičius"].sum() * 100
-            ).round(2)
 
-            pareto_top = pareto.head(10).copy()
-            pareto_top["Siuntėjas_short"] = pareto_top["Siuntėjas"].apply(lambda x: wrap_label(x, 16))
+        pareto = siuntejai_stats.sort_values(by="Klaidų skaičius", ascending=False).copy()
+        pareto["Kumuliacinis %"] = (
+            pareto["Klaidų skaičius"].cumsum() / pareto["Klaidų skaičius"].sum() * 100
+        ).round(2)
 
-            fig_pareto, ax1 = plt.subplots(figsize=(9, 5.5))
-            ax1.bar(pareto_top["Siuntėjas_short"], pareto_top["Klaidų skaičius"])
-            ax1.set_ylabel("Klaidų skaičius")
-            ax1.set_xlabel("Siuntėjas")
-            ax1.grid(axis="y", alpha=0.3)
+        pareto_top = pareto.head(10).copy()
+        pareto_top["Siuntėjas_short"] = pareto_top["Siuntėjas"].apply(lambda x: wrap_label(x, 16))
 
-            ax2 = ax1.twinx()
-            ax2.plot(pareto_top["Siuntėjas_short"], pareto_top["Kumuliacinis %"], color="red", marker="o", linewidth=2)
-            ax2.set_ylabel("Kumuliacinis %")
-            ax2.set_ylim(0, 110)
+        fig_pareto, ax1 = plt.subplots(figsize=(10, 5.8))
+        ax1.bar(pareto_top["Siuntėjas_short"], pareto_top["Klaidų skaičius"])
+        ax1.set_ylabel("Klaidų skaičius")
+        ax1.set_xlabel("Siuntėjas")
+        ax1.grid(axis="y", alpha=0.3)
 
-            plt.title("Pareto analizė – TOP siuntėjai")
-            plt.xticks(rotation=0, ha="center")
-            st.pyplot(fig_pareto)
-        else:
-            pareto = pd.DataFrame(columns=["Siuntėjas", "Klaidų skaičius", "Kumuliacinis %"])
-            st.info("Nėra duomenų.")
+        ax2 = ax1.twinx()
+        ax2.plot(
+            pareto_top["Siuntėjas_short"],
+            pareto_top["Kumuliacinis %"],
+            color="red",
+            marker="o",
+            linewidth=2
+        )
+        ax2.set_ylabel("Kumuliacinis %")
+        ax2.set_ylim(0, 110)
+
+        plt.title("Pareto analizė – TOP siuntėjai")
+        plt.xticks(rotation=0, ha="center")
+        st.pyplot(fig_pareto)
+
+    else:
+        priezastys = pd.DataFrame(columns=["Klaidos priežastis", "Klaidų skaičius"])
+        siuntejai_stats = pd.DataFrame(columns=["Siuntėjas", "Dokumentų_skaičius", "Klaidų skaičius", "Klaidų_procentas"])
+        uzsakovai_stats = pd.DataFrame(columns=["Užsakovas", "Dokumentų_skaičius", "Klaidų skaičius", "Klaidų_procentas"])
+        pareto = pd.DataFrame(columns=["Siuntėjas", "Dokumentų_skaičius", "Klaidų skaičius", "Klaidų_procentas", "Kumuliacinis %"])
+        st.info("Pagal pasirinktus filtrus klaidų nėra.")
 
     # ----------------------------
-    # Klaidų sąrašas
+    # KLAIDŲ SĄRAŠAS
     # ----------------------------
     st.subheader("📝 Klaidų sąrašas")
-    st.dataframe(klaidos.reset_index(drop=True), use_container_width=True, height=400)
+    st.dataframe(klaidos.reset_index(drop=True), use_container_width=True, height=420)
 
     # ----------------------------
-    # Excel eksporto paruošimas
+    # EXCEL EKSPORTAS
     # ----------------------------
-    img_summary_path = "grafikas_menesiai.png"
+    img_months_path = "grafikas_menesiai.png"
     img_reason_path = "grafikas_priezastys.png"
-    img_sender_path = "grafikas_siuntejai.png"
+    img_sender_count_path = "grafikas_siuntejai_kiekis.png"
+    img_sender_proc_path = "grafikas_siuntejai_proc.png"
     img_customer_path = "grafikas_uzsakovai.png"
     img_pareto_path = "grafikas_pareto.png"
 
-    fig_export.savefig(img_summary_path, bbox_inches="tight")
+    fig_months.savefig(img_months_path, bbox_inches="tight")
 
     if not klaidos.empty:
         fig_reason.savefig(img_reason_path, bbox_inches="tight")
-        fig_sender.savefig(img_sender_path, bbox_inches="tight")
+        fig_sender_count.savefig(img_sender_count_path, bbox_inches="tight")
+        fig_sender_proc.savefig(img_sender_proc_path, bbox_inches="tight")
         fig_customer.savefig(img_customer_path, bbox_inches="tight")
         fig_pareto.savefig(img_pareto_path, bbox_inches="tight")
 
@@ -447,7 +515,7 @@ if uploaded_file:
     ws1.title = "Suvestinė"
     for r in dataframe_to_rows(summary, index=False, header=True):
         ws1.append(r)
-    safe_add_image(ws1, img_summary_path, "I2")
+    safe_add_image(ws1, img_months_path, "I2")
 
     ws2 = wb.create_sheet(title="Klaidų sąrašas")
     for r in dataframe_to_rows(klaidos, index=False, header=True):
@@ -461,17 +529,30 @@ if uploaded_file:
     ws4 = wb.create_sheet(title="Siuntėjai")
     for r in dataframe_to_rows(siuntejai_stats, index=False, header=True):
         ws4.append(r)
-    safe_add_image(ws4, img_sender_path, "D2")
+    safe_add_image(ws4, img_sender_count_path, "F2")
 
-    ws5 = wb.create_sheet(title="Užsakovai")
-    for r in dataframe_to_rows(uzsakovai_stats, index=False, header=True):
+    ws5 = wb.create_sheet(title="Siuntėjų %")
+    if not siuntejai_stats.empty:
+        siuntejai_proc_export = siuntejai_stats[siuntejai_stats["Dokumentų_skaičius"] >= 3].sort_values(
+            by=["Klaidų_procentas", "Klaidų skaičius"],
+            ascending=[False, False]
+        )
+    else:
+        siuntejai_proc_export = pd.DataFrame(columns=siuntejai_stats.columns)
+
+    for r in dataframe_to_rows(siuntejai_proc_export, index=False, header=True):
         ws5.append(r)
-    safe_add_image(ws5, img_customer_path, "D2")
+    safe_add_image(ws5, img_sender_proc_path, "F2")
 
-    ws6 = wb.create_sheet(title="Pareto")
-    for r in dataframe_to_rows(pareto, index=False, header=True):
+    ws6 = wb.create_sheet(title="Užsakovai")
+    for r in dataframe_to_rows(uzsakovai_stats, index=False, header=True):
         ws6.append(r)
-    safe_add_image(ws6, img_pareto_path, "E2")
+    safe_add_image(ws6, img_customer_path, "F2")
+
+    ws7 = wb.create_sheet(title="Pareto")
+    for r in dataframe_to_rows(pareto, index=False, header=True):
+        ws7.append(r)
+    safe_add_image(ws7, img_pareto_path, "F2")
 
     excel_buffer = io.BytesIO()
     wb.save(excel_buffer)
@@ -485,7 +566,7 @@ if uploaded_file:
     )
 
     # ----------------------------
-    # AI analizė
+    # AI ANALIZĖ
     # ----------------------------
     st.subheader("🤖 Dirbtinio intelekto analizė")
 
@@ -498,13 +579,20 @@ if uploaded_file:
         analysis_prompt = f"""
 Analizuok pateiktus duomenis apie sąskaitų skaičių, klaidų procentą, klaidų priežastis, siuntėjus ir užsakovus.
 
+Svarbu:
+- Atskirai įvertink absoliutų klaidų kiekį ir klaidų procentą.
+- Nevertink vien tik pagal klaidų kiekį, nes kai kurie siuntėjai gali siųsti daugiau dokumentų.
+- Pabrėžk, kur problema yra apimtyje, o kur – kokybėje.
+
 Prašau:
 1. Įvertinti mėnesines tendencijas
 2. Nustatyti, kur koncentruojasi daugiausia klaidų
-3. Įvertinti, ar matomas Pareto principas
-4. Išskirti didžiausią problemą procese
-5. Pateikti aiškias rekomendacijas, kaip sumažinti klaidas
-6. Pabrėžti, ar problema labiau susijusi su šaltiniu, procesu ar duomenų kokybe
+3. Įvertinti, kurie siuntėjai siunčia daugiausia klaidų absoliučiai
+4. Įvertinti, kurie siuntėjai turi didžiausią klaidų procentą
+5. Įvertinti, ar matomas Pareto principas
+6. Išskirti didžiausią problemą procese
+7. Pateikti aiškias rekomendacijas, kaip sumažinti klaidas
+8. Pabrėžti, ar problema labiau susijusi su šaltiniu, procesu ar duomenų kokybe
 
 Mėnesių suvestinė:
 {summary_md}
@@ -512,10 +600,10 @@ Mėnesių suvestinė:
 Klaidos pagal priežastį:
 {priezastys_md}
 
-Klaidos pagal siuntėją:
+Siuntėjų analizė:
 {siuntejai_md}
 
-Klaidos pagal užsakovą:
+Užsakovų analizė:
 {uzsakovai_md}
 """
 
