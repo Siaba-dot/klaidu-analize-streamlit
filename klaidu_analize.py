@@ -13,7 +13,7 @@ import openai
 # OpenAI klientas
 client = openai.OpenAI(api_key=st.secrets["openai_api_key"])
 
-st.set_page_config(page_title="Klaidų analizės dashboard", layout="wide")
+st.set_page_config(page_title="Klaidų analizės skydelis", layout="wide")
 
 # ----------------------------
 # STILIUS
@@ -620,3 +620,4 @@ Užsakovų analizė:
     except Exception as e:
         st.warning("Nepavyko gauti AI analizės. Patikrink API raktą Streamlit `secrets` nustatymuose.")
         st.error(str(e))
+
