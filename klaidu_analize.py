@@ -138,10 +138,9 @@ if uploaded_file:
 
     # ----------------------------
     # DUOMENŲ PARUOŠIMAS
-    # O = 14 indeksas, P = 15 indeksas
     # ----------------------------
-    df["Klaidos_priežastis"] = df.iloc[:, 14].apply(clean_text)
-    df["Klaidos"] = df.iloc[:, 15].apply(clean_text)
+    df["Klaidos_priežastis"] = df.iloc[:, 14].apply(clean_text)  # O
+    df["Klaidos"] = df.iloc[:, 15].apply(clean_text)             # P
     df["Mėnuo"] = df["Klientas"].apply(extract_month)
     df["Yra klaida"] = df["Klaidos"].notna()
 
@@ -320,24 +319,33 @@ if uploaded_file:
         use_container_width=True
     )
 
+    # Iš anksto tuščios lentelės ir grafikai eksportui
+    priezastys = pd.DataFrame(columns=["Klaidos priežastis", "Klaidų skaičius"])
+    siuntejai_stats = pd.DataFrame(columns=["Siuntėjas", "Dokumentų_skaičius", "Klaidų skaičius", "Klaidų_procentas"])
+    uzsakovai_stats = pd.DataFrame(columns=["Užsakovas", "Dokumentų_skaičius", "Klaidų skaičius", "Klaidų_procentas"])
+    pareto = pd.DataFrame(columns=["Siuntėjas", "Dokumentų_skaičius", "Klaidų skaičius", "Klaidų_procentas", "Kumuliacinis %"])
+    siuntejai_proc_export = pd.DataFrame(columns=["Siuntėjas", "Dokumentų_skaičius", "Klaidų skaičius", "Klaidų_procentas"])
+
+    fig_reason = None
+    fig_sender_count = None
+    fig_sender_proc = None
+    fig_customer = None
+    fig_pareto = None
+
     # ----------------------------
     # ANALIZĖ, JEI YRA KLAIDŲ
     # ----------------------------
     if not klaidos.empty:
-        # Klaidos pagal priežastį
         priezastys = klaidos["Klaidos_priežastis"].fillna("Nenurodyta").value_counts().reset_index()
         priezastys.columns = ["Klaidos priežastis", "Klaidų skaičius"]
 
-        # Klaidos pagal siuntėją
         siuntejai_klaidos = klaidos["Siuntėjas"].fillna("Nenurodyta").value_counts().reset_index()
         siuntejai_klaidos.columns = ["Siuntėjas", "Klaidų skaičius"]
 
-        # Visi dokumentai pagal siuntėją
         siuntejai_visi = df_filtered.groupby("Siuntėjas").agg(
             Dokumentų_skaičius=("Sąskaitos faktūros Nr.", "count")
         ).reset_index()
 
-        # Sujungimas: dokumentų kiekis + klaidų kiekis
         siuntejai_stats = siuntejai_visi.merge(siuntejai_klaidos, on="Siuntėjas", how="left")
         siuntejai_stats["Klaidų skaičius"] = siuntejai_stats["Klaidų skaičius"].fillna(0).astype(int)
         siuntejai_stats["Klaidų_procentas"] = (
@@ -349,7 +357,6 @@ if uploaded_file:
             ascending=[False, False]
         ).reset_index(drop=True)
 
-        # Užsakovų analizė
         uzsakovai_klaidos = klaidos["Užsakovas"].fillna("Nenurodyta").value_counts().reset_index()
         uzsakovai_klaidos.columns = ["Užsakovas", "Klaidų skaičius"]
 
@@ -368,9 +375,7 @@ if uploaded_file:
             ascending=[False, False]
         ).reset_index(drop=True)
 
-        # ----------------------------
-        # 2 EILĖ: PRIEŽASTYS + TOP SIUNTĖJAI PAGAL KLAIDŲ KIEKĮ
-        # ----------------------------
+        # 2 eilė
         c1, c2 = st.columns(2)
 
         with c1:
@@ -400,9 +405,7 @@ if uploaded_file:
             ax_sender_count.grid(axis="x", alpha=0.3)
             st.pyplot(fig_sender_count)
 
-        # ----------------------------
-        # 3 EILĖ: TOP SIUNTĖJAI PAGAL KLAIDŲ PROCENTĄ + TOP UŽSAKOVAI
-        # ----------------------------
+        # 3 eilė
         c3, c4 = st.columns(2)
 
         with c3:
@@ -414,19 +417,24 @@ if uploaded_file:
                 ascending=[False, False]
             ).reset_index(drop=True)
 
+            siuntejai_proc_export = siuntejai_proc.copy()
+
             st.caption("Rodomi siuntėjai, kurie turi bent 3 dokumentus, kad procentas nebūtų klaidinantis.")
             st.dataframe(siuntejai_proc, use_container_width=True, height=320)
 
-            top_siuntejai_proc = siuntejai_proc.head(10).copy()
-            top_siuntejai_proc["Siuntėjas_short"] = top_siuntejai_proc["Siuntėjas"].apply(lambda x: ellipsis_label(x, 32))
+            if not siuntejai_proc.empty:
+                top_siuntejai_proc = siuntejai_proc.head(10).copy()
+                top_siuntejai_proc["Siuntėjas_short"] = top_siuntejai_proc["Siuntėjas"].apply(lambda x: ellipsis_label(x, 32))
 
-            fig_sender_proc, ax_sender_proc = plt.subplots(figsize=(8, 5))
-            ax_sender_proc.barh(top_siuntejai_proc["Siuntėjas_short"], top_siuntejai_proc["Klaidų_procentas"])
-            ax_sender_proc.set_title("TOP siuntėjai pagal klaidų procentą")
-            ax_sender_proc.set_xlabel("Klaidų procentas (%)")
-            ax_sender_proc.invert_yaxis()
-            ax_sender_proc.grid(axis="x", alpha=0.3)
-            st.pyplot(fig_sender_proc)
+                fig_sender_proc, ax_sender_proc = plt.subplots(figsize=(8, 5))
+                ax_sender_proc.barh(top_siuntejai_proc["Siuntėjas_short"], top_siuntejai_proc["Klaidų_procentas"])
+                ax_sender_proc.set_title("TOP siuntėjai pagal klaidų procentą")
+                ax_sender_proc.set_xlabel("Klaidų procentas (%)")
+                ax_sender_proc.invert_yaxis()
+                ax_sender_proc.grid(axis="x", alpha=0.3)
+                st.pyplot(fig_sender_proc)
+            else:
+                st.info("Nėra pakankamai siuntėjų su bent 3 dokumentais procentinei analizei.")
 
         with c4:
             st.subheader("🏢 TOP užsakovai su klaidomis")
@@ -443,9 +451,7 @@ if uploaded_file:
             ax_customer.grid(axis="x", alpha=0.3)
             st.pyplot(fig_customer)
 
-        # ----------------------------
-        # 4 EILĖ: PARETO
-        # ----------------------------
+        # 4 eilė: pataisytas Pareto
         st.subheader("📊 Pareto analizė pagal siuntėją")
 
         pareto = siuntejai_stats.sort_values(by="Klaidų skaičius", ascending=False).copy()
@@ -454,34 +460,31 @@ if uploaded_file:
         ).round(2)
 
         pareto_top = pareto.head(10).copy()
-        pareto_top["Siuntėjas_short"] = pareto_top["Siuntėjas"].apply(lambda x: wrap_label(x, 16))
+        pareto_top["Siuntėjas_short"] = pareto_top["Siuntėjas"].apply(lambda x: ellipsis_label(x, 32))
 
-        fig_pareto, ax1 = plt.subplots(figsize=(10, 5.8))
-        ax1.bar(pareto_top["Siuntėjas_short"], pareto_top["Klaidų skaičius"])
-        ax1.set_ylabel("Klaidų skaičius")
-        ax1.set_xlabel("Siuntėjas")
-        ax1.grid(axis="y", alpha=0.3)
+        fig_pareto, ax1 = plt.subplots(figsize=(10, 6.5))
+        ax1.barh(pareto_top["Siuntėjas_short"], pareto_top["Klaidų skaičius"])
+        ax1.set_xlabel("Klaidų skaičius")
+        ax1.set_ylabel("Siuntėjas")
+        ax1.grid(axis="x", alpha=0.3)
+        ax1.invert_yaxis()
 
-        ax2 = ax1.twinx()
+        ax2 = ax1.twiny()
         ax2.plot(
-            pareto_top["Siuntėjas_short"],
             pareto_top["Kumuliacinis %"],
+            pareto_top["Siuntėjas_short"],
             color="red",
             marker="o",
             linewidth=2
         )
-        ax2.set_ylabel("Kumuliacinis %")
-        ax2.set_ylim(0, 110)
+        ax2.set_xlabel("Kumuliacinis %")
+        ax2.set_xlim(0, 110)
+        ax2.axvline(80, color="gray", linestyle="--", linewidth=1)
 
         plt.title("Pareto analizė – TOP siuntėjai")
-        plt.xticks(rotation=0, ha="center")
         st.pyplot(fig_pareto)
 
     else:
-        priezastys = pd.DataFrame(columns=["Klaidos priežastis", "Klaidų skaičius"])
-        siuntejai_stats = pd.DataFrame(columns=["Siuntėjas", "Dokumentų_skaičius", "Klaidų skaičius", "Klaidų_procentas"])
-        uzsakovai_stats = pd.DataFrame(columns=["Užsakovas", "Dokumentų_skaičius", "Klaidų skaičius", "Klaidų_procentas"])
-        pareto = pd.DataFrame(columns=["Siuntėjas", "Dokumentų_skaičius", "Klaidų skaičius", "Klaidų_procentas", "Kumuliacinis %"])
         st.info("Pagal pasirinktus filtrus klaidų nėra.")
 
     # ----------------------------
@@ -502,11 +505,15 @@ if uploaded_file:
 
     fig_months.savefig(img_months_path, bbox_inches="tight")
 
-    if not klaidos.empty:
+    if fig_reason is not None:
         fig_reason.savefig(img_reason_path, bbox_inches="tight")
+    if fig_sender_count is not None:
         fig_sender_count.savefig(img_sender_count_path, bbox_inches="tight")
+    if fig_sender_proc is not None:
         fig_sender_proc.savefig(img_sender_proc_path, bbox_inches="tight")
+    if fig_customer is not None:
         fig_customer.savefig(img_customer_path, bbox_inches="tight")
+    if fig_pareto is not None:
         fig_pareto.savefig(img_pareto_path, bbox_inches="tight")
 
     wb = Workbook()
@@ -532,14 +539,6 @@ if uploaded_file:
     safe_add_image(ws4, img_sender_count_path, "F2")
 
     ws5 = wb.create_sheet(title="Siuntėjų %")
-    if not siuntejai_stats.empty:
-        siuntejai_proc_export = siuntejai_stats[siuntejai_stats["Dokumentų_skaičius"] >= 3].sort_values(
-            by=["Klaidų_procentas", "Klaidų skaičius"],
-            ascending=[False, False]
-        )
-    else:
-        siuntejai_proc_export = pd.DataFrame(columns=siuntejai_stats.columns)
-
     for r in dataframe_to_rows(siuntejai_proc_export, index=False, header=True):
         ws5.append(r)
     safe_add_image(ws5, img_sender_proc_path, "F2")
